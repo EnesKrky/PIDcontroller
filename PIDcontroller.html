@@ -1,0 +1,282 @@
+<canvas id="canvas"></canvas>
+<script>
+    let c=document.getElementById("canvas");
+    let ctx=c.getContext("2d");
+    ctx.canvas.width=window.innerWidth-20;
+    ctx.canvas.height=window.innerHeight-20;
+    let canvas_x=ctx.canvas.width;
+    let canvas_y=ctx.canvas.height;
+
+    let target_angle=225;
+    let follower_angle=50;
+
+    //Ki has to be smaller than Kp*Kd for stability.
+    let maxKp=30;
+    let maxKd=30;
+    let maxKi=maxKp*maxKd;
+
+    let dt=0.001;
+    let pre_error=target_angle-follower_angle;
+    let integral=0;
+    let velocity=0;
+
+    let length=Math.min(canvas_x,canvas_y)*0.15;
+
+    let sliders=[[canvas_x/1.75-24*length/5,canvas_y/2-100,length*2,length/7,0.66],[canvas_x/1.75-24*length/5,canvas_y/2,length*2,length/7,0.022],[canvas_x/1.75-24*length/5,canvas_y/2+100,length*2,length/7,0.33]]; //[[xposition,yposition,length,height,ratio],[...],...]
+    let Kp=maxKp*sliders[0][4];
+    let Ki=maxKi*sliders[1][4];
+    let Kd=maxKd*sliders[2][4];
+
+    function PID(desired_position,pos,vel,intgrl,pre_err,deltaT){
+        for(let i=0;i<50;i++){
+            error=(desired_position-pos);
+            intgrl+=(error+pre_err)/2*deltaT;
+            acc=error*Kp+intgrl*Ki+(error-pre_err)/deltaT*Kd;
+            newvel=vel+acc*deltaT;
+            pos=pos+(vel+newvel)/2*deltaT;
+            pre_err=error;
+            vel=newvel;
+        }
+        res=[pos,vel,intgrl,pre_err];
+        return res;
+    }
+
+    let control1=true;
+    let control2=true;
+    let control3=false;
+    let control4=true;
+    let control5=false;
+    let sliderindex=-1;
+    let aspectcheck=false;
+    function update(){
+        if(window.innerWidth-20!=canvas_x){
+            ctx.canvas.width=window.innerWidth-20;
+            canvas_x=ctx.canvas.width;
+            aspectcheck=true;
+        }
+        if(window.innerHeight-20!=canvas_y){
+            ctx.canvas.height=window.innerHeight-20;
+            canvas_y=ctx.canvas.height;
+            aspectcheck=true;
+        }
+        if(aspectcheck){
+            length=Math.min(canvas_x,canvas_y)*0.15;
+            sliders[0][0]=canvas_x/1.75-24*length/5;
+            sliders[1][0]=canvas_x/1.75-24*length/5;
+            sliders[2][0]=canvas_x/1.75-24*length/5;
+            sliders[0][1]=canvas_y/2-100;
+            sliders[1][1]=canvas_y/2;
+            sliders[2][1]=canvas_y/2+100;
+            sliders[0][2]=length*2;
+            sliders[1][2]=length*2;
+            sliders[2][2]=length*2;
+            sliders[0][3]=length/7;
+            sliders[1][3]=length/7;
+            sliders[2][3]=length/7;
+            aspectcheck=false;
+        }
+
+        if(Math.abs(target_angle-follower_angle)>180 && follower_angle>target_angle){
+            follower_angle-=360;
+        }
+        else if(Math.abs(target_angle-follower_angle)>180 && follower_angle<target_angle){
+            follower_angle+=360;
+        }
+
+        result=PID(target_angle,follower_angle,velocity,integral,pre_error,dt);
+        follower_angle=result[0];
+        velocity=result[1];
+        integral=result[2];
+        pre_error=result[3];
+
+        c.addEventListener("mousedown",function(event){
+            if(control1 && event.button==0){
+                if((event.clientX-canvas_x/1.75-2*length*Math.cos(target_angle*Math.PI/180))**2+(event.clientY-canvas_y/2-2*length*Math.sin(target_angle*Math.PI/180))**2<=length**2/25){
+                    control3=true;
+                    control1=false;
+                }
+                else{
+                    for(let i=0;i<sliders.length;i++){
+                        if((event.clientX-sliders[i][0]-sliders[i][2]*sliders[i][4])**2+(event.clientY-sliders[i][1])**2<=sliders[i][3]**2){
+                            sliderindex=i;
+                            control5=true;
+                            break;
+                        }
+                    }
+                    control1=false;
+                }
+            }
+        },false);
+        c.addEventListener("mousemove",function(event){
+            if(control3 && control4){
+                target_angle=Math.atan2(event.clientY-canvas_y/2,event.clientX-canvas_x/1.75)*180/Math.PI;
+                if(target_angle<0){
+                    target_angle+=360;
+                }
+                control4=false;
+            }
+            else if(control5 && control4){
+                if(event.clientX>=sliders[sliderindex][0] && event.clientX-sliders[sliderindex][0]>=sliders[sliderindex][2]){
+                    sliders[sliderindex][4]=1;
+                    if(sliderindex==0){
+                        Kp=maxKp;
+                        maxKi=Kp*Kd;
+                        Ki=maxKi*sliders[1][4];
+                    }
+                    else if(sliderindex==1){
+                        Ki=maxKi;
+                    }
+                    else{
+                        Kd=maxKd;
+                        maxKi=Kp*Kd;
+                        Ki=maxKi*sliders[1][4];
+                    }
+                }
+                else if(event.clientX<=sliders[sliderindex][0]){
+                    sliders[sliderindex][4]=0;
+                    if(sliderindex==0){
+                        Kp=0;
+                        maxKi=0;
+                        Ki=maxKi*sliders[1][4];
+                    }
+                    else if(sliderindex==1){
+                        Ki=0;
+                    }
+                    else{
+                        Kd=0;
+                        maxKi=0;
+                        Ki=maxKi*sliders[1][4];
+                    }
+                }
+                else{
+                    sliders[sliderindex][4]=(event.clientX-sliders[sliderindex][0])/sliders[sliderindex][2];
+                    if(sliderindex==0){
+                        Kp=maxKp*sliders[0][4];
+                        maxKi=Kp*Kd;
+                        Ki=maxKi*sliders[1][4];
+                    }
+                    else if(sliderindex==1){
+                        Ki=maxKi*sliders[1][4];
+                    }
+                    else{
+                        Kd=maxKd*sliders[2][4];
+                        maxKi=Kp*Kd;
+                        Ki=maxKi*sliders[1][4];
+                    }
+                }
+                control4=false;
+            }
+        },false);
+        c.addEventListener("mouseup",function(event){
+            if(control2 && control3 && event.button==0){
+                control3=false;
+                control2=false;
+            }
+            else if(control2 && control5 && event.button==0){
+                control5=false;
+                control2=false;
+                sliderindex=-1;
+            }
+        },false);
+
+        ctx.fillStyle="rgb(255,255,255)";
+        ctx.fillRect(0,0,canvas_x,canvas_y);
+        //draws lines related to target
+        ctx.lineWidth=5;
+        ctx.strokeStyle="rgba(0,0,0,0.6)";
+        ctx.beginPath();
+        ctx.moveTo(canvas_x/1.75,canvas_y/2);
+        ctx.lineTo(canvas_x/1.75+2*length*Math.cos(target_angle*Math.PI/180),canvas_y/2+2*length*Math.sin(target_angle*Math.PI/180));
+        ctx.stroke();
+        ctx.strokeStyle="rgb(0,0,0)";
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.arc(canvas_x/1.75,canvas_y/2,9*length/5,0,2*Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(canvas_x/1.75,canvas_y/2,11*length/5,0,2*Math.PI);
+        ctx.stroke();
+        //draws target
+        ctx.fillStyle="rgb(20,20,200)";
+        ctx.beginPath();
+        ctx.arc(canvas_x/1.75+2*length*Math.cos(target_angle*Math.PI/180),canvas_y/2+2*length*Math.sin(target_angle*Math.PI/180),length/5,0,2*Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        //draws circle
+        ctx.fillStyle="rgb(20,200,20)";
+        ctx.strokeStyle="rgb(0,0,0)";
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.arc(canvas_x/1.75,canvas_y/2,length*2/3,0,2*Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        //draws follower
+        ctx.fillStyle="rgb(200,20,20)";
+        ctx.beginPath();
+        ctx.moveTo(canvas_x/1.75,canvas_y/2);
+        ctx.lineTo(canvas_x/1.75+length*Math.cos((follower_angle+225)*Math.PI/180),canvas_y/2+length*Math.sin((follower_angle+225)*Math.PI/180));
+        ctx.lineTo(canvas_x/1.75+length*Math.cos(follower_angle*Math.PI/180),canvas_y/2+length*Math.sin(follower_angle*Math.PI/180));
+        ctx.lineTo(canvas_x/1.75+length*Math.cos((follower_angle+135)*Math.PI/180),canvas_y/2+length*Math.sin((follower_angle+135)*Math.PI/180));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        //draws fastener
+        ctx.fillStyle="rgba(0,0,0)";
+        ctx.beginPath();
+        ctx.arc(canvas_x/1.75,canvas_y/2,length/10,0,2*Math.PI);
+        ctx.fill();
+
+        //draws sliders
+        for(let i=0;i<sliders.length;i++){
+            ctx.fillStyle="rgb(160,160,160)";
+            ctx.beginPath();
+            ctx.arc(sliders[i][0],sliders[i][1],sliders[i][3]/2,0,2*Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(sliders[i][0]+sliders[i][2],sliders[i][1],sliders[i][3]/2,0,2*Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.rect(sliders[i][0],sliders[i][1]-sliders[i][3]/2,sliders[i][2],sliders[i][3]);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(sliders[i][0],sliders[i][1]-sliders[i][3]/2);
+            ctx.lineTo(sliders[i][0]+sliders[i][2],sliders[i][1]-sliders[i][3]/2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(sliders[i][0],sliders[i][1]+sliders[i][3]/2);
+            ctx.lineTo(sliders[i][0]+sliders[i][2],sliders[i][1]+sliders[i][3]/2);
+            ctx.stroke();
+            ctx.fillStyle="rgb(180,180,60)";
+            ctx.beginPath();
+            ctx.arc(sliders[i][0]+sliders[i][2]*sliders[i][4],sliders[i][1],sliders[i][3],0,2*Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle="rgb(0,0,0)";
+            ctx.font=length/4.5+"px cambria";
+            if(i==0){
+                ctx.fillText("Kp",sliders[0][0]-70,sliders[0][1]+8);
+                ctx.fillText(0,sliders[0][0]-10,sliders[0][1]+45);
+                ctx.fillText(Math.round(maxKp),sliders[0][0]+sliders[0][2]-10,sliders[0][1]+45);
+                ctx.fillText(Math.round(Kp),sliders[0][0]+sliders[0][2]/2-10,sliders[0][1]+45);
+            }
+            else if(i==1){
+                ctx.fillText("Ki",sliders[1][0]-70,sliders[1][1]+8);
+                ctx.fillText(0,sliders[1][0]-10,sliders[1][1]+45);
+                ctx.fillText(Math.round(maxKi),sliders[1][0]+sliders[1][2]-10,sliders[1][1]+45);
+                ctx.fillText(Math.round(Ki),sliders[1][0]+sliders[1][2]/2-10,sliders[1][1]+45);
+            }
+            else{
+                ctx.fillText("Kd",sliders[2][0]-70,sliders[2][1]+8);
+                ctx.fillText(0,sliders[2][0]-10,sliders[2][1]+45);
+                ctx.fillText(Math.round(maxKd),sliders[2][0]+sliders[2][2]-10,sliders[2][1]+45);
+                ctx.fillText(Math.round(Kd),sliders[2][0]+sliders[2][2]/2-10,sliders[2][1]+45);
+            }
+        }
+        control1=true;
+        control2=true;
+        control4=true;
+    }
+    setInterval(update,20);
+</script>
