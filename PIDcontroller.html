@@ -10,10 +10,8 @@
     let target_angle=225;
     let follower_angle=50;
 
-    //Ki has to be smaller than Kp*Kd for stability.
     let maxKp=30;
     let maxKd=30;
-    let maxKi=maxKp*maxKd;
 
     let dt=0.001;
     let pre_error=target_angle-follower_angle;
@@ -22,13 +20,15 @@
 
     let length=Math.min(canvas_x,canvas_y)*0.15;
 
-    let sliders=[[canvas_x/1.75-24*length/5,canvas_y/2-100,length*2,length/7,0.66],[canvas_x/1.75-24*length/5,canvas_y/2,length*2,length/7,0.022],[canvas_x/1.75-24*length/5,canvas_y/2+100,length*2,length/7,0.33]]; //[[xposition,yposition,length,height,ratio],[...],...]
+    let sliders=[[canvas_x/1.75-24*length/5,canvas_y/2-100,length*2,length/7,0.666],[canvas_x/1.75-24*length/5,canvas_y/2,length*2,length/7,0.05],[canvas_x/1.75-24*length/5,canvas_y/2+100,length*2,length/7,0.333]]; //[[xposition,yposition,length,height,ratio],[...],...]
     let Kp=maxKp*sliders[0][4];
-    let Ki=maxKi*sliders[1][4];
     let Kd=maxKd*sliders[2][4];
+    //Ki has to be smaller than Kp*Kd for stability.
+    let maxKi=Kp*Kd;
+    let Ki=maxKi*sliders[1][4];
 
     function PID(desired_position,pos,vel,intgrl,pre_err,deltaT){
-        for(let i=0;i<50;i++){
+        for(let i=0;i<25;i++){
             error=(desired_position-pos);
             intgrl+=(error+pre_err)/2*deltaT;
             acc=error*Kp+intgrl*Ki+(error-pre_err)/deltaT*Kd;
