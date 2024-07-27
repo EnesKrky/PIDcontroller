@@ -13,7 +13,6 @@
     let maxKp=30;
     let maxKd=30;
 
-    let dt=0.001;
     let pre_error=target_angle-follower_angle;
     let integral=0;
     let velocity=0;
@@ -48,7 +47,101 @@
     let control5=false;
     let sliderindex=-1;
     let aspectcheck=false;
-    function update(){
+
+    // It is okay for these callback functions to be present outside of the update loop
+    // as the update function do not contain any local variables
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures
+    c.addEventListener("mousedown",function(event){
+        if(control1 && event.button==0){
+            if((event.clientX-canvas_x/1.75-2*length*Math.cos(target_angle*Math.PI/180))**2+(event.clientY-canvas_y/2-2*length*Math.sin(target_angle*Math.PI/180))**2<=length**2/25){
+                control3=true;
+                control1=false;
+            }
+            else{
+                for(let i=0;i<sliders.length;i++){
+                    if((event.clientX-sliders[i][0]-sliders[i][2]*sliders[i][4])**2+(event.clientY-sliders[i][1])**2<=sliders[i][3]**2){
+                        sliderindex=i;
+                        control5=true;
+                        break;
+                    }
+                }
+                control1=false;
+            }
+        }
+    },false);
+    c.addEventListener("mousemove",function(event){
+        if(control3 && control4){
+            target_angle=Math.atan2(event.clientY-canvas_y/2,event.clientX-canvas_x/1.75)*180/Math.PI;
+            if(target_angle<0){
+                target_angle+=360;
+            }
+            control4=false;
+        }
+        else if(control5 && control4){
+            if(event.clientX>=sliders[sliderindex][0] && event.clientX-sliders[sliderindex][0]>=sliders[sliderindex][2]){
+                sliders[sliderindex][4]=1;
+                if(sliderindex==0){
+                    Kp=maxKp;
+                    maxKi=Kp*Kd;
+                    Ki=maxKi*sliders[1][4];
+                }
+                else if(sliderindex==1){
+                    Ki=maxKi;
+                }
+                else{
+                    Kd=maxKd;
+                    maxKi=Kp*Kd;
+                    Ki=maxKi*sliders[1][4];
+                }
+            }
+            else if(event.clientX<=sliders[sliderindex][0]){
+                sliders[sliderindex][4]=0;
+                if(sliderindex==0){
+                    Kp=0;
+                    maxKi=0;
+                    Ki=maxKi*sliders[1][4];
+                }
+                else if(sliderindex==1){
+                    Ki=0;
+                }
+                else{
+                    Kd=0;
+                    maxKi=0;
+                    Ki=maxKi*sliders[1][4];
+                }
+            }
+            else{
+                sliders[sliderindex][4]=(event.clientX-sliders[sliderindex][0])/sliders[sliderindex][2];
+                if(sliderindex==0){
+                    Kp=maxKp*sliders[0][4];
+                    maxKi=Kp*Kd;
+                    Ki=maxKi*sliders[1][4];
+                }
+                else if(sliderindex==1){
+                    Ki=maxKi*sliders[1][4];
+                }
+                else{
+                    Kd=maxKd*sliders[2][4];
+                    maxKi=Kp*Kd;
+                    Ki=maxKi*sliders[1][4];
+                }
+            }
+            control4=false;
+        }
+    },false);
+    c.addEventListener("mouseup",function(event){
+        if(control2 && control3 && event.button==0){
+            control3=false;
+            control2=false;
+        }
+        else if(control2 && control5 && event.button==0){
+            control5=false;
+            control2=false;
+            sliderindex=-1;
+        }
+    },false);
+
+    function update(dt){
         if(window.innerWidth-20!=canvas_x){
             ctx.canvas.width=window.innerWidth-20;
             canvas_x=ctx.canvas.width;
@@ -88,96 +181,6 @@
         velocity=result[1];
         integral=result[2];
         pre_error=result[3];
-
-        c.addEventListener("mousedown",function(event){
-            if(control1 && event.button==0){
-                if((event.clientX-canvas_x/1.75-2*length*Math.cos(target_angle*Math.PI/180))**2+(event.clientY-canvas_y/2-2*length*Math.sin(target_angle*Math.PI/180))**2<=length**2/25){
-                    control3=true;
-                    control1=false;
-                }
-                else{
-                    for(let i=0;i<sliders.length;i++){
-                        if((event.clientX-sliders[i][0]-sliders[i][2]*sliders[i][4])**2+(event.clientY-sliders[i][1])**2<=sliders[i][3]**2){
-                            sliderindex=i;
-                            control5=true;
-                            break;
-                        }
-                    }
-                    control1=false;
-                }
-            }
-        },false);
-        c.addEventListener("mousemove",function(event){
-            if(control3 && control4){
-                target_angle=Math.atan2(event.clientY-canvas_y/2,event.clientX-canvas_x/1.75)*180/Math.PI;
-                if(target_angle<0){
-                    target_angle+=360;
-                }
-                control4=false;
-            }
-            else if(control5 && control4){
-                if(event.clientX>=sliders[sliderindex][0] && event.clientX-sliders[sliderindex][0]>=sliders[sliderindex][2]){
-                    sliders[sliderindex][4]=1;
-                    if(sliderindex==0){
-                        Kp=maxKp;
-                        maxKi=Kp*Kd;
-                        Ki=maxKi*sliders[1][4];
-                    }
-                    else if(sliderindex==1){
-                        Ki=maxKi;
-                    }
-                    else{
-                        Kd=maxKd;
-                        maxKi=Kp*Kd;
-                        Ki=maxKi*sliders[1][4];
-                    }
-                }
-                else if(event.clientX<=sliders[sliderindex][0]){
-                    sliders[sliderindex][4]=0;
-                    if(sliderindex==0){
-                        Kp=0;
-                        maxKi=0;
-                        Ki=maxKi*sliders[1][4];
-                    }
-                    else if(sliderindex==1){
-                        Ki=0;
-                    }
-                    else{
-                        Kd=0;
-                        maxKi=0;
-                        Ki=maxKi*sliders[1][4];
-                    }
-                }
-                else{
-                    sliders[sliderindex][4]=(event.clientX-sliders[sliderindex][0])/sliders[sliderindex][2];
-                    if(sliderindex==0){
-                        Kp=maxKp*sliders[0][4];
-                        maxKi=Kp*Kd;
-                        Ki=maxKi*sliders[1][4];
-                    }
-                    else if(sliderindex==1){
-                        Ki=maxKi*sliders[1][4];
-                    }
-                    else{
-                        Kd=maxKd*sliders[2][4];
-                        maxKi=Kp*Kd;
-                        Ki=maxKi*sliders[1][4];
-                    }
-                }
-                control4=false;
-            }
-        },false);
-        c.addEventListener("mouseup",function(event){
-            if(control2 && control3 && event.button==0){
-                control3=false;
-                control2=false;
-            }
-            else if(control2 && control5 && event.button==0){
-                control5=false;
-                control2=false;
-                sliderindex=-1;
-            }
-        },false);
 
         ctx.fillStyle="rgb(255,255,255)";
         ctx.fillRect(0,0,canvas_x,canvas_y);
@@ -278,5 +281,33 @@
         control2=true;
         control4=true;
     }
-    setInterval(update,20);
+
+    // Calling the update function before the browser renders any frame
+    // Calculating the deltaT based on the monotonic timestamp provided by requestAnimationFrame
+    // https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+    let previousTimeStamp;
+    // slow down the animation speed by 20x
+    const timeScalingFactor = 1/20;
+    // Drop update calls when delta is more than 50ms
+    // This happens when browser is not actively rendering the frame; say when the user moves out of the tab
+    // This will also happen when the browser is strugling to do computations in very low end devices
+    const dropThreshold = 50;
+    window.requestAnimationFrame(animationSetup);
+
+    function animationSetup(timeStamp) {
+        previousTimeStamp = timeStamp;
+        window.requestAnimationFrame(animation);
+    }
+
+    function animation(timeStamp) {
+        let delta = timeStamp - previousTimeStamp;
+        previousTimeStamp = timeStamp;
+        if (delta <= dropThreshold) {
+            delta *= timeScalingFactor;
+            delta /= 1000;// convert milliseconds to seconds
+            update(delta);
+        }
+        window.requestAnimationFrame(animation);
+    }
+
 </script>
