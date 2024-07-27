@@ -13,7 +13,6 @@
     let maxKp=30;
     let maxKd=30;
 
-    let dt=0.001;
     let pre_error=target_angle-follower_angle;
     let integral=0;
     let velocity=0;
@@ -142,7 +141,7 @@
         }
     },false);
 
-    function update(){
+    function update(dt){
         if(window.innerWidth-20!=canvas_x){
             ctx.canvas.width=window.innerWidth-20;
             canvas_x=ctx.canvas.width;
@@ -282,5 +281,33 @@
         control2=true;
         control4=true;
     }
-    setInterval(update,20);
+
+    // Calling the update function before the browser renders any frame
+    // Calculating the deltaT based on the monotonic timestamp provided by requestAnimationFrame
+    // https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+    let previousTimeStamp;
+    // slow down the animation speed by 20x
+    const timeScalingFactor = 1/20;
+    // Drop update calls when delta is more than 50ms
+    // This happens when browser is not actively rendering the frame; say when the user moves out of the tab
+    // This will also happen when the browser is strugling to do computations in very low end devices
+    const dropThreshold = 50;
+    window.requestAnimationFrame(animationSetup);
+
+    function animationSetup(timeStamp) {
+        previousTimeStamp = timeStamp;
+        window.requestAnimationFrame(animation);
+    }
+
+    function animation(timeStamp) {
+        let delta = timeStamp - previousTimeStamp;
+        previousTimeStamp = timeStamp;
+        if (delta <= dropThreshold) {
+            delta *= timeScalingFactor;
+            delta /= 1000;// convert milliseconds to seconds
+            update(delta);
+        }
+        window.requestAnimationFrame(animation);
+    }
+
 </script>
